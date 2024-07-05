@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cinema</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" href="styles/index.css">
+</head>
+<body>
+    <section class="section">
+        <div class="container">
+            <div class="columns is-desktop">
+                <div class="column is-half">
+                    <h1 class="title is-1" id = "title">Il Cinema di ThREadNORD 🚂</h1>
+                </div>
+                <div class="column is-half" id = "searchReservation">
+                    <h4 class="title is-4"> Cerca la tua prenotazione: </h4>
+                    <input type = "text" class="input" id = "textForReservation" placeholder="Formato idProjection-idReservation (esempio 1-2)"><br><br>
+                    <button id = "findReservation" class="button is-info">Cerca prenotazione</button>
+                    
+                </div>
+
+            </div>
+            <div class="columns is-desktop">
+                <div class="column is-widescreen">
+                    <h3 class="title is-3">I nostri film:</h3>
+                    <div id = "movieList">
+                        <hr>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</body>
+<script>
+    const API_URI = "http://localhost:8080";
+
+
+    //funzione per ottenere la lista di movies e projections tramite REST
+    async function getMovies(){
+        const response = await fetch(API_URI + "/projections/");
+
+        if (!response.ok) {
+            console.log("Request failed! Error: " + response.status);
+            onError(response.statusText, response.status);
+            return;
+        }
+
+        return await response.json();
+    }
+
+    //funzione che aggiorna dinamicamente il contenuto della pagina, mostrando i movies e le relative projections
+    function displayMovies(movies){
+        let movieListDiv = document.getElementById("movieList");
+        for(movieID in movies){
+            //viene creato un div con l'id del movie corrispondente per stamparne le info e le projections
+            let movieDiv = document.createElement("div");
+            movieDiv.id = "movie-" + movieID;
+
+            //viene riempito il div con le informazioni del movie corrente
+            setMovieInfo((movies[movieID][0]), movieDiv);
+            //vengono stampate le projections
+
+            let projectionDiv = document.createElement("div");
+            projectionDiv.classList.add("columns");
+            projectionDiv.classList.add("is-multiline");
+            
+            setMovieProjections(movies[movieID], projectionDiv);
+            
+            movieDiv.appendChild(document.createElement("br"));
+            movieDiv.appendChild(projectionDiv);
+
+            movieDiv.appendChild(document.createElement("hr"));
+            movieListDiv.appendChild(movieDiv);
+        }
+    }
+
+    function setMovieInfo(movie, movieDiv){
+        
+        //viene creato un tag h4 per il titolo del file
+        let h4 = document.createElement("h4");
+        h4.classList.add("title");
+        h4.classList.add("is-4");
+        h4.appendChild(document.createTextNode("Titolo: " + movie.title));
+        movieDiv.appendChild(h4);
+        
+        //viene creato un paragrafo per la durata e uno per la descrizione
+        let spanTitle = document.createElement("span");
+        spanTitle.classList.add("title");
+        spanTitle.classList.add("is-5");
+
+        let spanContent = document.createElement("span");
+        spanContent.appendChild(document.createTextNode(movie.duration));
+
+        spanTitle.appendChild(document.createTextNode("Durata: "));
+        movieDiv.appendChild(spanTitle);        
+        movieDiv.appendChild(spanContent);
+        movieDiv.appendChild(document.createElement("br"));
+
+        spanTitle = document.createElement("span");
+        spanTitle.classList.add("title");
+        spanTitle.classList.add("is-5");
+        spanTitle.appendChild(document.createTextNode("Descrizione: "));
+
+        spanContent = document.createElement("span");
+        spanContent.appendChild(document.createTextNode(movie.description));
+        
+        movieDiv.appendChild(spanTitle);
+        movieDiv.appendChild(spanContent);
+        movieDiv.appendChild(document.createElement("br"));
+    }
+
+    function setMovieProjections(projections, projectionDiv){
+        for(let i = 1; i < projections.length; i++){
+
+            let div = document.createElement("div");
+            div.classList.add("column");
+            div.classList.add("is-one-third");
+            
+            //viene creato un form per il click del bottone
+            let projectionForm = document.createElement("form");
+            projectionForm.method = "GET"
+            projectionForm.action = "projection.html";
+            
+            //viene creato un bottone contenente l'id della projection corrente
+            let projectionButton = document.createElement("button");
+            projectionButton.id = "projection-" + projections[i].id;
+            projectionButton.type = "submit";
+            projectionButton.name = "projectionID";
+            projectionButton.classList.add("button");
+            projectionButton.classList.add("is-link");
+            projectionButton.value = projections[i].id;
+
+            //viene creato un paragrafo contenente la data e l'orario della projection corrente
+            p = document.createElement("p");
+            p.appendChild(document.createTextNode("Data: " + projections[i].date + " - Ora: " + projections[i].time + " - Numero Sala: " + projections[i].roomNumber));
+            projectionButton.appendChild(p);
+            projectionForm.appendChild(projectionButton);
+            div.appendChild(projectionForm);
+            projectionDiv.appendChild(div);
+            }
+    }
+
+    //funzione per ordinare le projection in ordine temporale
+    function orderProjections(movies){
+        for(movieID in movies){
+            //viene rimosso e memorizzato l'elemento di posto 0 (ovvero il movie)
+            let movie = movies[movieID][0];
+            let projectionList = movies[movieID].slice(1);
+            //vengono ordinate le projections in base all'orario usando la funzione sort
+            projectionList.sort(
+                function compareDateTime(projection1, projection2){
+                    //vengono creati due oggetti date e confrontati per vedere quale delle due projections avviene prima
+                    let date1 = new Date(projection1.date + " " + projection1.time).getTime();
+                    let date2 = new Date(projection2.date + " " + projection2.time).getTime();
+                    return date1 - date2; 
+                });
+            //viene inserito il movie in testa alla lista ordinata
+            projectionList.unshift(movie);
+            //viene aggiornata la lista nell'oggetto originale
+            movies[movieID] = projectionList;
+        }
+    }    
+
+    function loadReservation(){
+        let inputValue = document.getElementById("textForReservation").value;
+        inputValue = inputValue.trim();
+        let minusIndex = inputValue.indexOf("-");
+        let projectionID = inputValue.substring(0, minusIndex) 
+        let reservationID = inputValue.substring(minusIndex + 1);
+        window.location.replace("reservation.html?projectionID=" + projectionID + "&reservationID=" + reservationID);
+    }
+    function onError(msg, error) {
+        const out = `${msg}: ${error}`;
+        alert(out);
+        window.location.reload();
+    }
+
+    window.onload = init();
+
+    async function init() {
+        //viene richiesta la lista di movies tramite API
+        let movies = await getMovies();
+        //le projections vengono ordinate in ordine temporale
+        orderProjections(movies);
+        //il contenuto viene mostrato a video
+        displayMovies(movies);
+
+
+        document.getElementById("findReservation").addEventListener("click", loadReservation);
+    }
+    
+</script>
+</html>

@@ -1,0 +1,63 @@
+.checkbox{
+    width: 10vh;
+    height: 10vh;
+    border-radius: 20%;
+    position: relative;
+    border: 1px solid black;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+}
+
+.freeSeat:checked{
+    background: #288c5f;
+}
+
+
+.reservedSeat:checked {
+    background: red;
+}
+
+.reservedSeat:checked:after {
+    content: "\1F7AC";
+    color: #fff;
+    font-size: 5vh;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    -webkit-transform: translate(-50%,-50%);
+    -moz-transform: translate(-50%,-50%);
+    -ms-transform: translate(-50%,-50%);
+    transform: translate(-50%,-50%);
+}
+
+.freeSeat:checked:after {
+    content: "\2714";
+    color: #fff;
+    font-size: 5vh;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    -webkit-transform: translate(-50%,-50%);
+    -moz-transform: translate(-50%,-50%);
+    -ms-transform: translate(-50%,-50%);
+    transform: translate(-50%,-50%);
+}
+
+hr{
+    border-bottom: 2px solid black;
+}
+body{
+    background-color: #cce6fd;
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+    min-height: 100vh;
+}
+body::-webkit-scrollbar {
+    display: none;
+}
+
+td{
+    padding-left: 2px;
+    padding-right: 2px;
+}

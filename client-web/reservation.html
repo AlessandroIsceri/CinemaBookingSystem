@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" href="styles/reservation.css">
+    <title>La tua prenotazione</title>
+</head>
+<body>
+    <section class="section">
+        <div class="container">
+            <div class="columns is-mobile is-centered">
+                <div class="columns is-multiline">
+                    <div class="column">
+                        <h1 id = "movieTitle" class = "title is-2">
+
+                        </h1>
+                        <h2 id = "movieDateTime" class = "title is-4">
+
+                        </h2>
+                        <hr>
+                        <h2 class = "title is-4" id = "info-reservation">
+                            
+                        </h2>
+                        <table id = "seatsMap">
+                            
+                        </table>
+                        <button id = "submitReserveSeats" class="button is-success">Modifica Prenotazione</button> 
+                        <button id = "delButton" class = "button is-danger">Cancella Prenotazione</button>
+                        <a href = "index.html"><button id = "homeButton" class = "button is-info">Torna alla home</button></a>
+                    </div>    
+                </div>
+            </div>
+        </div>
+    </section>
+<script>
+
+        const API_URI = "http://localhost:8080";
+        const RESERVATION_ID = new URLSearchParams(window.location.search).get("reservationID");
+        const PROJECTION_ID = new URLSearchParams(window.location.search).get("projectionID");
+
+        //funzione per ottenere le info della projection attraverso il protocollo REST
+        async function getProjectionInfo(){
+            const response = await fetch(API_URI + "/projections/" + PROJECTION_ID);
+
+            if (!response.ok) {
+                console.log("Request failed! Error: " + response.status);
+                onError(response.statusText, response.status);
+                return;
+            }
+
+            return await response.json();
+        }
+
+        //funzione per ottenere le informazioni di una reservation attraverso il protocollo REST
+        async function getReservationInfo() {
+            const response = await fetch(API_URI + "/projections/" + PROJECTION_ID + "/reservations/" + RESERVATION_ID);
+
+            if (!response.ok) {
+                console.log("Request failed! Error: " + response.status);
+                onError(response.statusText, response.status);
+                return;
+            }
+
+            return await response.json();
+        }
+
+        //funzione per aggiornare i posti prenotati attraverso il protocollo REST
+        async function reserveSeats(reservedSeats){
+            //viene inizializzata la reservation con i nuovi posti selezionati
+            let reservation = {
+                "projectionID" : PROJECTION_ID,
+                "id" : RESERVATION_ID,
+                "reservedSeats" : reservedSeats
+            };
+
+            const response = await fetch(API_URI + "/projections/" + PROJECTION_ID + "/reservations/" + RESERVATION_ID, {
+                method : "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body : JSON.stringify(reservation)
+            });
+            
+            if (response.status != 204) {
+                console.log("Request failed! Error: " + response.status);
+                onError(response.statusText, response.status);
+                return;
+            }
+        }
+
+        //funzione per eliminare una reservation attraverso il protocollo REST
+        async function deleteReservation() {
+            const response = await fetch(API_URI + "/projections/" + PROJECTION_ID + "/reservations/" + RESERVATION_ID, {
+                method: "DELETE"
+            });
+            if (response.status != 204) {
+                console.log("Request failed! Error: " + response.status);
+                onError(response.statusText, response.status);
+                return;
+            }
+        }
+
+        //funzione per eliminare una reservation
+        async function delReservation(){
+            if(confirm("Sei sicuro di voler annullare la prenotazione?") ==  true){
+                await deleteReservation();
+                alert("La prenotazione è stata cancellata correttamente, sarai reindirizzato alla home");
+                window.location.replace("index.html");
+            }
+        }
+        
+        async function getReservedSeats(){
+            //vengono ricavati i posti selezionati dall'utente
+            let reservedSeats = getSelectedSeats();
+            await reserveSeats(reservedSeats);
+            //viene ricaricata la pagina (così da mostrare la reservation aggiornata)
+            location.reload();
+        }
+
+        //funzione per mostrare i posti disponibili e non della projection
+        function displaySeatMap(projection, room, reservation){
+            let table = document.getElementById("seatsMap");
+            let rowNumber = room.rows;
+            let colNumber = room.columns;
+            let submitButton = document.createElement("button");
+            //viene creata una tabella, composta da checkbox, di dimensioni rowNumber*colNumber
+            for(let i = 0; i < rowNumber; i++){
+                let tr = document.createElement("tr");
+                for(let j = 0; j < colNumber; j++){
+                    let td = document.createElement("td");
+                    
+                    let checkbox = document.createElement("input");
+                    checkbox.type = "checkbox";
+                    checkbox.name = "seats";
+                    checkbox.classList.add("checkbox");
+                    //ad ogni checkbox viene assegnato come valore il numero di posto corrispondente alla riga e alla colonna
+                    checkbox.value = i * colNumber + j;
+                    
+                    //se un posto è prenotato da qualcun altro, allora verrà checkato e disabilitato
+                    //se un posto è prenotato dalla reservation, allora verrà checkato
+                    //se un posto è libero verrà disabilitato (i posti si possono solo rimuovere da una reservation)
+                    if(projection.availableSeats[i][j] == true){
+                        checkbox.disabled = true;
+                        checkbox.classList.add("staticSeat");
+                    }
+                    else{
+                        if(reservation.reservedSeats.includes(i * colNumber + j)){
+                            checkbox.classList.add("freeSeat");
+                            checkbox.checked = true;
+                        }else{
+                            checkbox.classList.add("reservedSeat");
+                            checkbox.checked = true;
+                            checkbox.disabled = true;
+                            checkbox.ariaDisabled = true;
+                        }
+                    }
+                    
+                    td.appendChild(checkbox);
+                    tr.appendChild(td);
+                }
+                table.appendChild(tr);
+            }
+        }
+
+        //funzione per ottenere i posti selezionati dall'utente
+        function getSelectedSeats(){
+            let seats = document.getElementsByName("seats");
+            let i = 0;
+            let reservedSeats = [];
+            for(seat of seats){
+                if(seat.disabled == true){
+                    continue;
+                }
+                if(seat.checked == true){
+                    reservedSeats[i] = seat.value;
+                    i++;
+                }
+            }
+            return reservedSeats;
+        }
+
+        function onError(msg, error) {
+            const out = `${msg}: ${error}`;
+            alert(out);
+            window.location.replace("index.html");
+        }
+
+        window.onload = init();
+
+        async function init() {
+
+            //vengono controllati i parametri passati
+            if(PROJECTION_ID == ""){
+                onError("Pagina non trovata", " inserire il projectionID");
+            }
+
+            if(RESERVATION_ID == ""){
+                onError("Pagina non trovata", " inserire il reservationID");
+            }
+
+            //vengono ricavate le informazioni sulla projection che si vuole visualizzare
+            let projectionInfo = await getProjectionInfo();
+            let projection = projectionInfo[0];
+            let movie = projectionInfo[1];
+            let room = projectionInfo[2];
+
+            //viene controllato se la reservation esiste
+            let reservation = await getReservationInfo();
+            if(reservation == null){
+                alert("La prenotazione non esiste, potrebbero essere stati rimossi tutti i posti prenotati (è stata cancellata) oppure potresti aver inserito un id errato");
+                window.location.replace("index.html");
+            }
+            
+            displaySeatMap(projection, room, reservation);
+
+            //aggiungo le informazioni sulla proiezione (id, titolo, data e sala)
+            document.getElementById("info-reservation").appendChild(document.createTextNode("L'id della tua prenotazione: " + PROJECTION_ID  + "-" + RESERVATION_ID));
+            document.getElementById("movieTitle").appendChild(document.createTextNode(movie.title + " - la tua prenotazione"));
+            let options = {'weekday': 'long', 'month': '2-digit', 'day': '2-digit', 'year': 'numeric'};
+            let data = new Date(projection.date).toLocaleString('it-IT', options);
+            document.getElementById("movieDateTime").appendChild(document.createTextNode(data + " - " + projection.time + " - Sala numero: " + room.roomNumber));
+
+            //vengono aggiunti i listener per aggiornare i posti prenotati o cancellare la reservation
+            document.getElementById("submitReserveSeats").addEventListener("click", getReservedSeats);      
+
+            document.getElementById("delButton").addEventListener("click", delReservation);
+        }
+    </script>
+</body>
+</html>

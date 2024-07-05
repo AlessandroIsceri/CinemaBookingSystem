@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Informazioni Proiezione</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" href="styles/projection.css">
+</head>
+<body>
+    <section class="section">
+        <div class="container">
+            <div class="columns is-centered">
+                <div class="columns is-multiline">
+                    <div class="column">
+                        <h2 id = "movieTitle" class = "title is-2">
+
+                        </h2>
+                        <h3 id = "movieDateTime" class = "title is-4">
+
+                        </h3>
+                        <hr>
+                        <h2 class = "title is-4">
+                            I posti disponibili:
+                        </h2>
+                        <div id = "container">
+                            <table id = "seatsMap">
+                                
+                            </table>
+                            <button id = "submitReserveSeats" class="button is-success">Prenota</button>
+                            <a href = "index.html"><button id = "homeButton" class = "button is-info">Torna alla home</button></a>
+                        </div>
+
+                        <div id = "location">
+                            
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+    <script>
+
+        const API_URI = "http://localhost:8080";
+        //viene ricavato il projection id dalla lista dei parametri
+        const PROJECTION_ID = new URLSearchParams(window.location.search).get("projectionID");
+
+        //funzione per ricavare le informazioni della projection che si vuole visualizzare tramite REST
+        async function getProjectionInfo(){
+            //viene effettuata una chiamata GET come da protocollo
+            const response = await fetch(API_URI + "/projections/" + PROJECTION_ID);
+
+            //se lo status code non è 200 allora la GET non è andata a buon fine
+            if (!response.ok) {
+                console.log("Request failed! Error: " + response.status);
+                onError(response.statusText, response.status);
+                return;
+            }
+            
+            return await response.json();
+        }
+
+        //funzione per prenotare dei posti tramite REST
+        async function reserveSeats(reservedSeats){
+            //viene inizializzata la reservation (manca l'id in quanto verrà determinato e assegnato dalla servlet)
+            let reservation = {
+                "projectionID" : PROJECTION_ID,
+                "reservedSeats" : reservedSeats
+            };
+            //viene effettuata una chiamata di tipo POST come da protocollo
+            const response = await fetch(API_URI + "/projections/" + PROJECTION_ID + "/reservations/", {
+                method : "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body : JSON.stringify(reservation)
+            });
+            if (!response.ok) {
+                console.log("Request failed! Error: " + response.status);
+                onError(response.statusText, response.status);
+                return;
+            }
+            //viene ritornata la location
+            return await response.headers.get("Location");
+        }
+
+        //listener per il bottone di prenotazione
+        async function getReservedSeats(){
+            //vengono inizializzati i posti da riservare
+            let reservedSeats = getSelectedSeats();
+            
+            //viene stampato un link per accedere alla pagina della reservation e l'id della reservation
+            let location = await reserveSeats(reservedSeats);
+            let reservationID = location.substring(location.lastIndexOf("/") + 1);
+            
+            //l'utente viene reinderizzato alla pagina della reservation
+            window.location.replace("reservation.html?projectionID="+ PROJECTION_ID + "&reservationID=" + reservationID);
+        }
+
+        function getSelectedSeats(){
+            let seats = document.getElementsByName("seats");
+            let reservedSeats = [];
+            let i = 0;
+            //vengono iterate le checkbox e viene salvato il numero (di posto) di quelle selezionate
+            for (seat of seats) {
+                if (seat.disabled == true) {
+                    continue;
+                }
+                if (seat.checked == true) {
+                    reservedSeats[i] = seat.value;
+                    i++;
+                }
+            }
+            return reservedSeats;
+        }
+
+        //funzione per mostrare i posti disponibili e non della projection
+        function displaySeatMap(projection, room){
+            let table = document.getElementById("seatsMap");
+            let rowNumber = room.rows;
+            let colNumber = room.columns;
+            let submitButton = document.createElement("button");
+            
+            //viene creata una tabella, composta da checkbox, di dimensioni rowNumber*colNumber
+            for(let i = 0; i < rowNumber; i++){
+                let tr = document.createElement("tr");
+                for(let j = 0; j < colNumber; j++){
+                    let td = document.createElement("td");
+                    
+                    let checkbox = document.createElement("input");
+                    checkbox.type = "checkbox";
+                    checkbox.name = "seats";
+                    checkbox.classList.add("checkbox");
+                    //ad ogni checkbox viene assegnato come valore il numero di posto corrispondente alla riga e alla colonna
+                    checkbox.value = i * colNumber + j;
+                    
+                    //vengono settate le classi in base alla disponbilità del posto
+                    if(projection.availableSeats[i][j] == true){
+                        checkbox.classList.add("freeSeat");
+                        checkbox.disabled = false;
+                    }
+                    else{
+                        checkbox.classList.add("reservedSeat");
+                        checkbox.checked = true;
+                        checkbox.disabled = true;
+                    }
+                    td.appendChild(checkbox);
+                    tr.appendChild(td);
+                }
+                table.appendChild(tr);
+            }
+        }
+
+        function onError(msg, error) {
+            const out = `${msg}: ${error}`;
+            alert(out);
+            window.location.replace("index.html");
+        }
+
+        window.onload = init();
+
+        async function init() {
+
+            //viene controllato il parametro passato
+            if(PROJECTION_ID == ""){
+                onError("Pagina non trovata", " inserire il projectionID");
+            }
+
+            //vengono ricavate le informazioni sulla projection che si vuole visualizzare
+            let projectionInfo = await getProjectionInfo();
+            let projection = projectionInfo[0];
+            let movie = projectionInfo[1];
+            let room = projectionInfo[2];
+            
+            //vengono mostrati i posti disponibili e non della projection
+            displaySeatMap(projection, room);
+
+            //vengono aggiunte le informazioni sulla projection (titolo e data e sala)
+            document.getElementById("movieTitle").appendChild(document.createTextNode(movie.title + " - le informazioni sulla proiezione"));
+            let options = {'weekday': 'long', 'month': '2-digit', 'day': '2-digit', 'year': 'numeric'};
+            let data = new Date(projection.date).toLocaleString('it-IT', options);
+            document.getElementById("movieDateTime").appendChild(document.createTextNode(data + " - " + projection.time + " - Sala numero: " + room.roomNumber));
+
+            //viene aggiunto il listener al bottone per prenotare
+            document.getElementById("submitReserveSeats").addEventListener("click", getReservedSeats);      
+        }
+
+    </script>
+</body>
+</html>
